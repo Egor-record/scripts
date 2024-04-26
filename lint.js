@@ -7,19 +7,22 @@ const path = require('path');
 const Tests = {
   checkVue(stagedFiles) {
     const vueFiles = stagedFiles.filter(filename => filename.endsWith('.vue'));
-
     const log = (failed, errMessage) => failed ? console.error("FAIL: ", errMessage) : console.log("OK");
     const tests = {
       hasStyleTag({ content }) {
         const styleTagRegex = /<style\b[^>]*>(.*?)<\/style>/gs;
         return styleTagRegex.test(content);
       },
+      hasNoComponentName({ content }) {
+        const exportDefaultRegex = /export\s+default\s+\{\s*name:\s*'[^']+'/;
+        return !exportDefaultRegex.test(content);
+      },
       fileNameWithSmallLetter({filename}) {
         const parts = filename.split('/');
         const extractedFilename = parts[parts.length - 1];
         const lowerCaseRegex = /^[a-z]/;
         return lowerCaseRegex.test(extractedFilename);
-      }
+      },
     }
     const runTest = () => {
         const fileReadPromises = vueFiles.map(filename => {
@@ -28,6 +31,7 @@ const Tests = {
                return fs.readFile(filePath, 'utf8', (err, data) => {
                 if (err) {
                   console.error(`Error reading file ${filename}:`, err);
+                  reject()
                 }
                 resolve(data)
               });
