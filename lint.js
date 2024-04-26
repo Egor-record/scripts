@@ -7,36 +7,52 @@ const path = require('path');
 const Tests = {
   checkVue(stagedFiles) {
     const vueFiles = stagedFiles.filter(filename => filename.endsWith('.vue'));
+
+    const log = (failed, errMessage) => failed ? console.error("FAIL: ", errMessage) : console.log("OK");
     const tests = {
-          hasStyleTag({ data }) {
-            const styleTagRegex = /<style\b[^>]*>(.*?)<\/style>/gs;
-            return styleTagRegex.test(data);
-          },
-          fileNameWithSmallLetter({filename}) {
-            const lowerCaseRegex = /^[a-z]/;
-            return lowerCaseRegex.test(filename);
-          }
+      hasStyleTag({ content }) {
+        const styleTagRegex = /<style\b[^>]*>(.*?)<\/style>/gs;
+        return styleTagRegex.test(content);
+      },
+      fileNameWithSmallLetter({filename}) {
+        const parts = filename.split('/');
+        const extractedFilename = parts[parts.length - 1];
+        const lowerCaseRegex = /^[a-z]/;
+        return lowerCaseRegex.test(extractedFilename);
+      }
     }
-    const log = (fn, errMessage) => {
-          if (fn) {
-            console.error("FAIL: ", errMessage)
-          } 
-    }
-    vueFiles.forEach(filename => {
-      const filePath = path.resolve(filename);
-      fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) {
-                console.error(`Error reading file ${filePath}: ${err.message}`);
-                return;
-        }
-        for (const testName in tests) {
-          if (tests.hasOwnProperty(testName) && typeof tests[testName] === 'function') {
-              log(tests[testName]({ data, filename }), `${filename}, ${testName}`)
-            }
-          }
+    const runTest = () => {
+        const fileReadPromises = vueFiles.map(filename => {
+            const filePath = path.resolve(filename);
+            return new Promise((resolve, reject) => {
+               return fs.readFile(filePath, 'utf8', (err, data) => {
+                if (err) {
+                  console.error(`Error reading file ${filename}:`, err);
+                }
+                resolve(data)
+              });
+            })
+        
         });
-    });
-  }
+
+        Promise.all(fileReadPromises).then(fileContents => {
+            fileContents.forEach((content, index) => {
+              for (const testName in tests) {
+                if (tests.hasOwnProperty(testName) && typeof tests[testName] === 'function') {
+                  log(tests[testName]({ content, filename: vueFiles[index]  }), `${vueFiles[index]}, ${testName}`)
+                }
+              }
+        
+            });
+          })
+          .catch(error => {
+            // Handle errors here
+            console.error('Error reading files:', error);
+        });
+
+      }
+    runTest()
+  },
 }
 
 
